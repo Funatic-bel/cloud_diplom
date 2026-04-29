@@ -23,3 +23,8 @@ REST API сервис для облачного хранения файлов с
 {
   "auth-token": "xxxx"
 }
+
+## Run
+
+mvn clean package
+docker-compose up --build
