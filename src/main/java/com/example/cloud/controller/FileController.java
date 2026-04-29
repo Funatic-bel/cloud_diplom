@@ -1,8 +1,10 @@
 package com.example.cloud.controller;
 
 import com.example.cloud.entity.FileEntity;
-import com.example.cloud.repository.FileRepository;
 import com.example.cloud.service.AuthService;
+import com.example.cloud.service.FileService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,22 +16,25 @@ import java.util.List;
 @RequestMapping("/file")
 public class FileController {
 
+    private static final Logger log = LoggerFactory.getLogger(FileController.class);
+
     private static final String STORAGE_PATH =
             System.getProperty("user.dir") + "/storage/";
 
-    private final FileRepository fileRepository;
+    private final FileService fileService;
     private final AuthService authService;
 
-    public FileController(FileRepository fileRepository,
+    public FileController(FileService fileService,
                           AuthService authService) {
-        this.fileRepository = fileRepository;
+        this.fileService = fileService;
         this.authService = authService;
     }
-
 
     @PostMapping
     public String uploadFile(@RequestParam("file") MultipartFile file,
                              @RequestHeader("auth-token") String token) throws IOException {
+
+        log.info("Upload request");
 
         String user = authService.getLoginByToken(token);
 
@@ -47,20 +52,22 @@ public class FileController {
         entity.setPath(path);
         entity.setOwner(user);
 
-        fileRepository.save(entity);
+        fileService.save(entity);
+
+        log.info("File uploaded: {}", file.getOriginalFilename());
 
         return "uploaded: " + file.getOriginalFilename();
     }
-
 
     @GetMapping
     public List<FileEntity> list(@RequestHeader("auth-token") String token) {
 
         String user = authService.getLoginByToken(token);
 
-        return fileRepository.findByOwner(user);
-    }
+        log.info("List files for user: {}", user);
 
+        return fileService.getUserFiles(user);
+    }
 
     @DeleteMapping
     public String delete(@RequestParam("id") Long id,
@@ -68,16 +75,18 @@ public class FileController {
 
         String user = authService.getLoginByToken(token);
 
-        FileEntity file = fileRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Not found"));
+        FileEntity file = fileService.getById(id);
 
         if (!file.getOwner().equals(user)) {
+            log.error("Access denied for user: {}", user);
             return "Access denied";
         }
 
         new File(file.getPath()).delete();
 
-        fileRepository.delete(file);
+        fileService.delete(file);
+
+        log.info("File deleted: {}", file.getFilename());
 
         return "deleted";
     }
